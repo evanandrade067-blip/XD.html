@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Evan -10 | CONCERT OVERLOAD 9e36%</title>
+    <style>
+        body { background-color: #020000; color: #fff; font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; overflow: hidden; }
+        
+        .main-card { 
+            background: #000; border: 2px solid #ff0055; padding: 30px; border-radius: 20px; 
+            width: 550px; text-align: center; box-shadow: 0 0 100px #ff0055; 
+            position: relative; z-index: 2;
+        }
+
+        .cassette-player { border: 4px solid #00eaff; border-radius: 15px; padding: 20px; margin-bottom: 25px; background: #050505; }
+        .reel { width: 70px; height: 70px; border: 8px double #00eaff; border-radius: 50%; display: inline-block; margin: 0 15px; }
+
+        #vol-val { 
+            font-size: 1rem; font-weight: 900; color: #ff0055; display: block; 
+            word-break: break-all; margin: 15px 0; text-shadow: 0 0 10px #ff0055;
+        }
+
+        input[type="range"] { width: 100%; cursor: crosshair; accent-color: #ff0055; }
+
+        /* Efecto de terremoto cuando el volumen es Evan -10 */
+        .earthquake { animation: shake 0.05s infinite; }
+        @keyframes shake {
+            0% { transform: translate(2px, 2px) rotate(0deg); }
+            50% { transform: translate(-2px, -2px) rotate(1deg); }
+            100% { transform: translate(2px, -2px) rotate(-1deg); }
+        }
+
+        .capture-btn { 
+            background: #ff0055; color: #fff; border: none; width: 100%; 
+            padding: 20px; font-weight: bold; cursor: pointer; font-size: 1.2rem;
+            text-transform: uppercase; box-shadow: 0 0 20px #ff0055; margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-card" id="card">
+    <h1 style="font-size: 0.8rem; letter-spacing: 5px; color: #00eaff;">MODO DIOS: EVAN -10</h1>
+    
+    <div class="cassette-player">
+        <div id="rl" class="reel"></div>
+        <div id="rr" class="reel"></div>
+        <canvas id="v" style="width:100%; height:100px; margin-top:10px;"></canvas>
+    </div>
+
+    <button class="capture-btn" id="start">ACTIVAR VOLUMEN PROHIBIDO</button>
+
+    <div style="background: #111; padding: 15px; border-radius: 10px;">
+        <span id="vol-val">100%</span>
+        <input type="range" id="boost" min="1" max="90000000000000000000000000000000000" step="1e30" value="1">
+    </div>
+    <p style="font-size: 0.5rem; color: #555; margin-top: 10px;">ADVERTENCIA: MAS FUERTE QUE UN CONCIERTO REAL</p>
+</div>
+
+<script>
+    let audioCtx, analyzer, source, gains = [];
+    let rotation = 0;
+
+    document.getElementById('start').onclick = async () => {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyzer = audioCtx.createAnalyser();
+        
+        // APILAMIENTO DE GANANCIA (6 niveles de amplificación)
+        // Esto rompe los límites del navegador para sonar extremadamente fuerte
+        let lastNode = analyzer;
+        for(let i=0; i<6; i++) {
+            let g = audioCtx.createGain();
+            g.gain.value = 1;
+            lastNode.connect(g);
+            gains.push(g);
+            lastNode = g;
+        }
+        lastNode.connect(audioCtx.destination);
+
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true });
+            source = audioCtx.createMediaStreamSource(stream);
+            source.connect(analyzer);
+            loop();
+        } catch (e) { alert("Error: Selecciona 'Compartir audio del sistema'"); }
+    };
+
+    function loop() {
+        requestAnimationFrame(loop);
+        const data = new Uint8Array(analyzer.frequencyBinCount);
+        analyzer.getByteFrequencyData(data);
+        
+        let avg = data.reduce((a,b) => a+b)/data.length;
+        let bVal = parseFloat(document.getElementById('boost').value);
+        
+        // Rotación de cassettes según el poder
+        rotation += (avg/10) * (Math.log10(bVal+1));
+        document.getElementById('rl').style.transform = `rotate(${rotation}deg)`;
+        document.getElementById('rr').style.transform = `rotate(${rotation}deg)`;
+
+        // Visualizador
+        const canvas = document.getElementById('v');
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#ff0055';
+        data.forEach((val, i) => {
+            ctx.fillRect(i*2, canvas.height, 1, -val/2);
+        });
+
+        // Efecto terremoto
+        if(bVal > 1e10) document.getElementById('card').classList.add('earthquake');
+        else document.getElementById('card').classList.remove('earthquake');
+    }
+
+    document.getElementById('boost').oninput = function() {
+        let v = parseFloat(this.value);
+        document.getElementById('vol-val').innerText = (v * 100).toLocaleString('fullwide', {useGrouping:false}) + "%";
+        
+        if (gains.length > 0) {
+            // Dividimos el poder entre todos los amplificadores apilados
+            let powerPerNode = Math.pow(v, 1/6); 
+            gains.forEach(g => {
+                g.gain.setTargetAtTime(powerPerNode, audioCtx.currentTime, 0.01);
+            });
+        }
+    };
+</script>
+</body>
+</html>
